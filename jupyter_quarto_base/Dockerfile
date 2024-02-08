@@ -14,6 +14,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     original-awk \
     wget \
     pandoc-citeproc \
+    fonts-liberation \
     curl \
     gdebi-core \
     librsvg2-bin \

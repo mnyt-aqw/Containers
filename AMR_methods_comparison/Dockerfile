@@ -1,4 +1,4 @@
-FROM mnytaqw/quarto_jupyter_base
+FROM mnytaqw/quarto_jupyter_base:latest
 
 RUN mamba install \
     pandas==2.2.0 \
@@ -10,15 +10,18 @@ RUN mamba install \
     plotly==5.18.0 \
     statsmodels==0.14.1 \
     theme-darcula \
-    ipywidgets=8.0.7 \
+    ipywidgets==8.0.7 \
+    biopython==1.83 \
     tabulate \
+    nodejs \
     -y --quiet
 
 RUN python3 -m pip install \ 
     nbzip \
+    ipydrawio \
+    ipydrawio-export \
     jupyterlab-quarto \
     jupyterlab-spellchecker \
-    jupyterlab-git \
     jupyterlab-code-formatter \
     black \
     isort
