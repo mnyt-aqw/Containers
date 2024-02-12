@@ -1,27 +1,103 @@
-FROM mnytaqw/quarto_jupyter_base:latest
+# Use the specified Miniconda base image
+FROM continuumio/miniconda3:23.5.2-0
 
-RUN mamba install \
-    pandas==2.2.0 \
-    scipy==1.12.0 \
-    matplotlib==3.8.2 \
-    seaborn==0.13.2 \
-    numpy==1.26.3 \
-    scikit-learn==1.4.0 \
-    plotly==5.18.0 \
-    statsmodels==0.14.1 \
-    theme-darcula \
-    ipywidgets==8.0.7 \
-    biopython==1.83 \
-    tabulate \
-    nodejs \
-    -y --quiet
+# Set environment variables to non-interactive and define Quarto version
+ENV DEBIAN_FRONTEND=noninteractive \
+    QUARTO_VERSION=1.4.549 \
+    LC_ALL=C \
+    PATH=/opt/conda/bin/:$PATH
 
-RUN python3 -m pip install \ 
-    nbzip \
-    ipydrawio \
-    ipydrawio-export \
-    jupyterlab-quarto \
-    jupyterlab-spellchecker \
-    jupyterlab-code-formatter \
-    black \
-    isort
+# Install system dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    pandoc \
+    wget \
+    original-awk \
+    wget \
+    pandoc-citeproc \
+    fonts-liberation \
+    curl \
+    gdebi-core \
+    librsvg2-bin \
+    texlive-xetex \
+    texlive-fonts-recommended \
+    texlive-plain-generic \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
+# Determine system architecture and download the appropriate Quarto version
+RUN ARCH=$(uname -m) && \
+    if [ "$ARCH" = "x86_64" ]; then \
+        QUARTO_ARCH="amd64"; \
+    elif [ "$ARCH" = "aarch64" ]; then \
+        QUARTO_ARCH="arm64"; \
+    else \
+        echo "Unsupported architecture: $ARCH"; \
+        exit 1; \
+    fi && \
+    curl -o quarto-linux-$QUARTO_ARCH.deb -L https://github.com/quarto-dev/quarto-cli/releases/download/v$QUARTO_VERSION/quarto-$QUARTO_VERSION-linux-$QUARTO_ARCH.deb \
+    && dpkg --add-architecture $QUARTO_ARCH \
+    && gdebi --non-interactive quarto-linux-$QUARTO_ARCH.deb \
+    && rm -f quarto-linux-$QUARTO_ARCH.deb
+
+# Install TinyTeX and install packages with tlmgr
+RUN wget -qO- "https://yihui.org/tinytex/install-bin-unix.sh" | sh && \
+    ARCH=$(uname -m) && \
+    if [ "$ARCH" = "x86_64" ]; then \
+        PATH=/root/.TinyTeX/bin/x86_64-linux:$PATH; \
+    elif [ "$ARCH" = "aarch64" ]; then \
+        PATH=/root/.TinyTeX/bin/aarch64-linux:$PATH; \
+    fi && \
+    tlmgr install fvextra footnotebackref pagecolor sourcesanspro sourcecodepro titling
+
+USER root
+
+RUN set -e -x && \
+    mkdir -p /input
+
+# Configure conda channels
+RUN conda config --add channels defaults \
+    && conda config --add channels bioconda \
+    && conda config --add channels conda-forge
+
+# Install Mamba into the base environment = faster solver
+RUN /opt/conda/bin/conda install mamba -n base -c conda-forge -y
+
+# Install Jupyter and scientific libraries with conda
+RUN mamba install jupyterlab==4.0.11 \
+       nbconvert \
+       r-base==4.3.2 \
+       r-reticulate \
+       r-shiny \
+       r-htmltools \
+       r-knitr \
+       r-jsonlite \
+       r-rmarkdown \
+       r-renv \
+       r-remotes \
+       r-codetools \
+       r-irkernel \
+       r-mixomics==6.3.2 \
+       r-tidyverse==2.0.0 \
+       r-plotly==4.10.4 \
+       r-ggpubr \
+       r-viridislite \
+       rpy2 \
+       pandas==2.2.0 \
+       scipy==1.12.0 \
+       matplotlib==3.8.2 \
+       seaborn==0.13.2 \
+       numpy==1.26.3 \
+       scikit-learn==1.4.0 \
+       plotly==5.18.0 \
+       statsmodels==0.14.1 \
+       ipywidgets==8.0.7 \
+       biopython==1.83 \
+       Pyarrow \
+       tabulate \
+       -y --quiet
+
+# Final cleanup
+RUN apt-get autoremove -y \
+    && apt-get clean
+
+# Docker file adapted from https://dev.to/cavo789/running-quarto-markdown-in-docker-4igj
